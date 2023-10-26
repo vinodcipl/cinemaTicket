@@ -1,0 +1,26 @@
+{
+  "name": "cinematicket",
+  "version": "1.0.0",
+  "description": "demo project to demonstrate the cinema ticket platform",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vinodcipl/cinemaTicket.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/vinodcipl/cinemaTicket/issues"
+  },
+  "homepage": "https://github.com/vinodcipl/cinemaTicket#readme",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "mongoose": "^7.6.3",
+    "nodemon": "^3.0.1"
+  }
+}
