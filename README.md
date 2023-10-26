@@ -1,2 +1,2 @@
 # cinemaTicket
-demo project to demonstrate the cinema ticket platform
+MERN stact demo project to demonstrate the cinema ticket platform
