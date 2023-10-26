@@ -4,7 +4,11 @@ const cors = require('cors');
 
 const app = express();
 
-mongoose.connect('mongodb://localhost:27017/cinema', {
+// Externalizing configuration
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/cinema';
+const PORT = process.env.PORT || 8080;
+
+mongoose.connect(MONGODB_URI, {
     useNewUrlParser: true,
     useUnifiedTopology: true
 });
@@ -12,7 +16,7 @@ mongoose.connect('mongodb://localhost:27017/cinema', {
 const CinemaSchema = new mongoose.Schema({
     seats: Number,
     purchasedSeats: [Number]
-});
+}, { versionKey: '_version' });
 
 const Cinema = mongoose.model('Cinema', CinemaSchema);
 
@@ -49,25 +53,38 @@ app.get('/cinemas', async (req, res) => {
 app.post('/cinemas/:id/purchase', async (req, res) => {
     try {
         const { seatNumber } = req.body;
-        const cinema = await Cinema.findById(req.params.id);
+        // Attempt to find and update the cinema with the given conditions
+        const cinema = await Cinema.findOneAndUpdate({
+            _id: req.params.id,
+            purchasedSeats: { $ne: seatNumber }  // ensures the seat isn't already purchased
+        }, {
+            $push: { purchasedSeats: seatNumber }
+        }, {
+            new: true,  // return the updated document
+            runValidators: true  // ensures the update respects schema validations
+        });
 
-        if (cinema.purchasedSeats.includes(seatNumber)) {
-            return res.status(400).json({ error: 'Seat already purchased' });
+        if (!cinema) {
+            return res.status(400).json({ error: 'Seat already purchased or cinema not found' });
         }
 
-        cinema.purchasedSeats.push(seatNumber);
-        await cinema.save();
         res.json({ cinema, message: 'Seat purchased successfully!' });
+
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
+
 // Route to purchase the first two consecutive free seats
 app.post('/cinemas/:id/purchase-consecutive', async (req, res) => {
     try {
-        const cinema = await Cinema.findById(req.params.id);
         let foundSeats = null;
+
+        const cinema = await Cinema.findById(req.params.id);
+        if (!cinema) {
+            return res.status(404).json({ error: 'Cinema not found' });
+        }
 
         for (let i = 1; i < cinema.seats; i++) {
             if (!cinema.purchasedSeats.includes(i) && !cinema.purchasedSeats.includes(i + 1)) {
@@ -80,14 +97,28 @@ app.post('/cinemas/:id/purchase-consecutive', async (req, res) => {
             return res.status(400).json({ error: 'No two consecutive seats available' });
         }
 
-        cinema.purchasedSeats.push(...foundSeats);
-        await cinema.save();
+        // Ensure atomic update for the two seats
+        const updatedCinema = await Cinema.findOneAndUpdate({
+            _id: req.params.id,
+            purchasedSeats: { $ne: foundSeats[0], $ne: foundSeats[1] }  // ensures neither of the seats are already purchased
+        }, {
+            $push: { purchasedSeats: { $each: foundSeats } }
+        }, {
+            new: true,
+            runValidators: true
+        });
 
-        res.json({ cinema, seats: foundSeats });
+        if (!updatedCinema) {
+            return res.status(400).json({ error: 'Seats were purchased before you could complete the transaction' });
+        }
+
+        res.json({ cinema: updatedCinema, seats: foundSeats });
+
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
+
 
 // Route to fetch available seats for a cinema
 app.get('/cinemas/:id/available-seats', async (req, res) => {
@@ -105,6 +136,6 @@ app.get('/cinemas/:id/available-seats', async (req, res) => {
 
 
 
-app.listen(8080, () => {
-    console.log('Server running on http://localhost:8080');
+app.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
 });
